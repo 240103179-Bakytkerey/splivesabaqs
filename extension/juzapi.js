@@ -223,8 +223,10 @@
       link: linkOf(meeting), linked, published: lesson.published === true, lessonUrl: lessonUrl(p, lesson.id || p.lessonId), connectionCount: meetings.length,
       editable: {}, inherited: {}
     };
-    // In a connection linked to another lesson the meeting's own fields belong to the source lesson.
-    for (const key of ['studentTitle', 'date', 'start', 'end', 'attendance', 'percent', 'email']) if (linked) { data.editable[key] = false; if (data[key] === '' || data[key] === null) data.inherited[key] = true; }
+    // In a connection linked to another lesson the meeting's own fields belong to the source lesson and are checked
+    // there (as on the page, where they are read-only). The API even reports the source lesson's title as its name
+    // (seen 05.11.2026), so comparing them here would show differences that cannot be fixed in this lesson.
+    for (const key of ['studentTitle', 'date', 'start', 'end', 'attendance', 'percent', 'email']) if (linked) { data.editable[key] = false; data.inherited[key] = true; }
     if (meeting?.id && !linked) data.editable.email = false;
     const ids = new Set(meeting?.groupIds || []);
     data.groups = all.length > 0 && all.every(g => ids.has(g.id));
