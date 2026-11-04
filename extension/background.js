@@ -1,7 +1,8 @@
-// JUZ40 LIVE 1.1.0 — фондық бөлік.
+// JUZ40 LIVE 1.2.0 — фондық бөлік.
 // Жоспарлаушы енді сайтта тұрады. Сайттағы bridge.js осы жұмысшыға port арқылы қосылып, команда жібереді,
 // ал бұл жерде тек juz40-edu.kz бетімен жұмыс істейтін қадамдар орындалады (1.0.5 жоспарлаушысындағы adapter).
-importScripts('config.js');
+// 1.2.0: «API арқылы» режимінде сол әрекеттер бетсіз, juz40-edu.kz API-і арқылы орындалады (juzapi.js).
+importScripts('config.js', 'model.js', 'juzapi.js');
 const SITE = self.JUZ40_SITE;
 const JUZ = 'https://juz40-edu.kz';
 const PAGE_FILES = ['model.js', 'ui.js', 'content.js'];
@@ -122,6 +123,18 @@ const methods = {
     const r = await chrome.tabs.sendMessage(tab.id, {source: 'juz40-v1', action: 'diagnose', payload: {}});
     if (!r?.ok) throw Error(r?.error || 'Бетпен байланыс үзілді.');
     return r.data;
+  },
+  // API mode: the same actions as `call`, done with juz40-edu.kz API requests. The chosen JUZ40 tab only lends its
+  // login session; nothing is opened or clicked. `payload.at` is the course or lesson address the step works on.
+  async api({action, payload, sourceTabId}) {
+    if (!ACTIONS.has(action)) throw safeError('Белгісіз әрекет: ' + action);
+    const tab = await sourceTab(sourceTabId);
+    return JuzApi.call(tab.id, action, payload);
+  },
+  // Read-only: checks that the API answers for the course or lesson open in the chosen tab.
+  async apiDiagnose({tabId}) {
+    const tab = await sourceTab(tabId);
+    return JuzApi.diagnose(tab.id, tab.url);
   },
   async stopNavigation() { abortNavigation?.(); return {}; },
   async forgetWorkTab() { await chrome.storage.session.remove('workTabId'); return {}; },
