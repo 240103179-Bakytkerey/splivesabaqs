@@ -82,5 +82,30 @@
   const courses=Object.entries(rows).flatMap(([subject,list])=>list.map(([stream,direction,id,type])=>({subject,stream,direction,id,subjects:type==='combo'?['ms','geometry']:[subject],name:`SMART-PRO | ${direction} | ${type==='combo'?'МС+ГЕОМ':codes[subject]} | ${months[stream]}`,url:`https://juz40-edu.kz/headTeacher/subjects/${subjectIds[subject]}/${id}`})));
   function buildBindings(D){return Object.fromEntries(D.schedule.map(slot=>[slot.id,courses.filter(c=>c.stream===slot.stream&&c.subjects.includes(slot.subject)).filter(c=>{try{D.checkScope(slot,c.name);return true;}catch{return false;}}).map(c=>({name:c.name,url:c.url}))]));}
   function unmatched(D){const used=new Set(Object.values(buildBindings(D)).flat().map(b=>b.url));return courses.filter(c=>!used.has(c.url));}
-  const api={courses,buildBindings,unmatched};if(typeof module!=='undefined')module.exports=api;else root.LiveCourses=api;
+  // 1.3.0: courses read from the JUZ40 account (extension → apiCourses). Names follow «SMART-PRO | бағыт | код | ай»;
+  // the code gives the subject (model.js codes), the month gives the stream (settings stream name). A course that would
+  // be a second one for the same stream + direction + subject is not added: a row would then fill two lessons.
+  function fromJuz(items,settings,catalog,M){
+    const added=[],skipped=[],unknown=[];
+    const key=(stream,direction,subject)=>stream+'|'+M.direction(direction)+'|'+subject;
+    const taken=new Map();for(const c of catalog)for(const s of c.subjects)taken.set(key(c.stream,c.direction,s),c);
+    const known=new Set(catalog.map(c=>c.id));
+    const byCode=Object.fromEntries(Object.entries(M.codes).map(([k,v])=>[v,k]));
+    for(const item of items){
+      if(!item?.id||known.has(item.id))continue;
+      const parts=String(item.name||'').split('|').map(M.clean);
+      if(parts.length!==4||!/^SMART[- ]?PRO$/i.test(parts[0])){unknown.push(item.name);continue;}
+      const [,direction,code,month]=parts,c=M.norm(code).replace(/\s/g,'');
+      const subjects=c==='МС+ГЕОМ'?['ms','geometry']:byCode[c]?[byCode[c]]:[];
+      const stream=settings.streams.find(s=>M.norm(s.name)===M.norm(month));
+      if(!subjects.length||!stream||!M.courseId(item.url)){unknown.push(item.name);continue;}
+      const clash=subjects.map(s=>taken.get(key(stream.id,direction,s))).find(Boolean);
+      if(clash){skipped.push({name:item.name,clash:clash.name});continue;}
+      const course={subject:subjects[0],stream:stream.id,direction,id:item.id,subjects,name:item.name,url:item.url};
+      for(const s of subjects)taken.set(key(stream.id,direction,s),course);
+      added.push(course);known.add(item.id);
+    }
+    return {added,skipped,unknown};
+  }
+  const api={courses,buildBindings,unmatched,fromJuz};if(typeof module!=='undefined')module.exports=api;else root.LiveCourses=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

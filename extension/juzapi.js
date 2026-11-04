@@ -392,11 +392,32 @@
     return {url: at ? new URL(at).origin + new URL(at).pathname : '', page: p?.lessonId ? 'lesson' : p ? 'course' : 'unknown', checks, structure: {formControls: [], buttons: [], switches: [], dialogs: 0, api: API}};
   }
 
+  // ---------- Course catalogue (read-only) ----------
+  // The head teacher's subjects and their courses, as the site lists them (/v1/headteacher/subjects → …/courses).
+  // Paged answers ({content, totalPages}) are read page by page.
+  async function pages(s, path) {
+    const first = await get(s, path, {page: 0, size: 100});
+    const items = list(first);
+    const total = Number(first?.totalPages) || 1;
+    for (let page = 1; page < Math.min(total, 50); page++) items.push(...list(await get(s, path, {page, size: 100})));
+    return items;
+  }
+  async function courses(s) {
+    const subjects = list(await get(s, '/v1/headteacher/subjects'));
+    if (!subjects.length) throw safeError('Аккаунтта пән табылмады (бас мұғалім аккаунты керек).');
+    const out = [];
+    for (const subject of subjects) {
+      if (!subject?.id) continue;
+      for (const c of await pages(s, `/v1/headteacher/subjects/${subject.id}/courses`)) if (c?.id) out.push({id: c.id, name: nameOf(c), subjectId: subject.id, subjectName: nameOf(subject), url: `${JUZ}/headTeacher/subjects/${subject.id}/${c.id}`});
+    }
+    return {subjects: subjects.length, courses: out};
+  }
+
   const actions = {open, snapshot, createMeet, attach, fillNotes, patch, save, publish: (s, t) => setPublished(s, t, true), unpublish: (s, t) => setPublished(s, t, false)};
   async function call(tabId, action, payload) {
     if (!Object.hasOwn(actions, action)) throw safeError('Белгісіз әрекет: ' + action);
     const s = await session(tabId);
     return actions[action](s, payload || {});
   }
-  root.JuzApi = {call, diagnose: async (tabId, at) => diagnose(await session(tabId), at), toServer, fromServer, place, htmlText, htmlBold, instructionHtml, lessonCandidates, meetingFor, practicalBody, API};
+  root.JuzApi = {call, diagnose: async (tabId, at) => diagnose(await session(tabId), at), courses: async tabId => courses(await session(tabId)), toServer, fromServer, place, htmlText, htmlBold, instructionHtml, lessonCandidates, meetingFor, practicalBody, API};
 })(globalThis);

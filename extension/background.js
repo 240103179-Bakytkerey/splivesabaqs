@@ -136,6 +136,11 @@ const methods = {
     const tab = await sourceTab(tabId);
     return JuzApi.diagnose(tab.id, tab.url);
   },
+  // Read-only: every course of the head teacher's subjects, for «Курстарды JUZ40-тан жүктеу» on the site.
+  async apiCourses({tabId}) {
+    const tab = await sourceTab(tabId);
+    return JuzApi.courses(tab.id);
+  },
   async stopNavigation() { abortNavigation?.(); return {}; },
   async forgetWorkTab() { await chrome.storage.session.remove('workTabId'); return {}; },
   async focusWorkTab() {
