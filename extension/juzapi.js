@@ -56,7 +56,7 @@
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     if (response.ok) return data;
-    const detail = typeof data === 'object' && data ? clean(data.message || data.error || data.detail || data.title || JSON.stringify(data)).slice(0, 300) : clean(text).slice(0, 300);
+    const detail = typeof data === 'object' && data ? clean([].concat(data.messages || data.message || data.error || data.detail || data.title || JSON.stringify(data)).join('; ')).slice(0, 300) : clean(text).slice(0, 300);
     if (response.status === 401) throw safeError('JUZ40 сессиясы аяқталған. Аккаунтқа қайта кіріп, бетті жаңартыңыз.');
     if (response.status === 403) throw safeError('Аккаунтта бұл әрекетке рұқсат жоқ (' + method + ' ' + path + ').');
     if (response.status >= 400 && response.status < 500) throw safeError(`JUZ40 сұрауды қабылдамады (${response.status}${detail ? ': ' + detail : ''}).`);
@@ -121,11 +121,18 @@
   }
   // rating-task-types is a list of tags; its exact shape is not documented, so the «Live сабақ» entry is found by
   // any of its text fields and sent back with the value the server gave it.
+  // The server returns plain keys (e.g. ["LIVE_SABAK", …]); the page shows them through its translation file
+  // (assets/i18n/kk.json, 05.11.2026), where these keys read «Live сабақ».
+  const LIVE_TAG_KEYS = ['LIVE_SABAK', 'PRAKTIKALYK_SABAK', 'PRACTICAL'];
   const tagTexts = item => typeof item === 'string' ? [item] : Object.values(item || {}).filter(v => typeof v === 'string');
-  const isLiveTag = item => tagTexts(item).some(t => norm(t) === norm(LIVE_TAG) || norm(t).replace(/[_\s-]/g, '') === 'LIVE');
+  const isLiveTag = item => tagTexts(item).some(t => LIVE_TAG_KEYS.includes(t) || norm(t) === norm(LIVE_TAG) || norm(t).replace(/[_\s-]/g, '') === 'LIVE');
   const tagValue = item => typeof item === 'string' ? item : item.value ?? item.code ?? item.key ?? item.type ?? item.id ?? item.name;
   const tagTypes = s => get(s, '/v1/lessons/rating-task-types').then(list);
-  async function liveTag(s) { return tagValue(unique((await tagTypes(s)).filter(isLiveTag), `«${LIVE_TAG}» тапсырма тегі`)); }
+  async function liveTag(s) {
+    const items = await tagTypes(s), found = items.filter(isLiveTag);
+    if (found.length !== 1) throw safeError(`«${LIVE_TAG}» тапсырма тегі ${found.length ? 'бірмәнді емес: ' + found.map(tagValue).join(', ') : 'табылмады'}. Сайттағы тегтер: ${items.map(tagValue).join(', ') || 'бос'}.`);
+    return tagValue(found[0]);
+  }
   // The tag is reported by its label, as the page shows it, so model.diff compares it with «Live сабақ».
   async function tagLabel(s, value) {
     if (value === null || value === undefined || value === '') return '';
@@ -368,7 +375,8 @@
       await probe('Курс топтары', () => groups(s, p.courseId), g => g.length + ' топ');
       await probe('Ұйымдастырушы email-дері', () => get(s, '/v1/lessons/practics/meeting-organizer-emails').then(list), e => e.length + ' email');
       await probe(`«${LIVE_TAG}» тапсырма тегі`, () => liveTag(s), v => 'мәні ' + JSON.stringify(v));
-      await probe('Тақырыптар (API)', () => get(s, '/v2/themes', {courseId: p.courseId}).then(list), l => l.length + ' тақырып');
+      // The site always asks for one month and week; without them the server answers 400.
+      await probe('Тақырыптар (API, 1-ай 1-апта)', () => get(s, '/v2/themes', {courseId: p.courseId, month: 1, week: 1}).then(list), l => l.length + ' тақырып');
       if (p.lessonId) {
         const lesson = await probe('Сабақ', () => get(s, `/v1/lessons/${p.lessonId}`), l => nameOf(l) + ' · ' + (l.lessonType || '?'));
         if (lesson) {

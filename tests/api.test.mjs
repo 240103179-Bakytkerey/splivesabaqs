@@ -40,7 +40,7 @@ async function fakeFetch(input, init = {}) {
   let m;
   if (method === 'GET' && (m = path.match(/^\/v1\/courses\/([^/]+)$/))) return json(200, db.courses[m[1]]);
   if (method === 'GET' && (m = path.match(/^\/v1\/headteacher\/courses\/([^/]+)\/groups$/))) return json(200, db.groups[m[1]] || []);
-  if (method === 'GET' && path === '/v1/lessons/rating-task-types') return json(200, [{value: 'HOMEWORK', nameKz: 'Үй жұмысы'}, {value: 'LIVE_LESSON', nameKz: 'Live сабақ'}]);
+  if (method === 'GET' && path === '/v1/lessons/rating-task-types') return json(200, ['HOMEWORK', 'PS_KONSPEKT', 'LIVE_SABAK']);
   if (method === 'GET' && path === '/v1/lessons/practics/meeting-organizer-emails') return json(200, ['smartpro_esep@juz40onl.com']);
   if (method === 'GET' && path === '/v2/themes') return json(200, db.themes.filter(t => t.courseId === url.searchParams.get('courseId') && (!url.searchParams.get('month') || String(t.month) === url.searchParams.get('month')) && (!url.searchParams.get('week') || String(t.week) === url.searchParams.get('week'))));
   if (method === 'POST' && path === '/v1/themes') { const t = {id: uuid(), ...body}; db.themes.push(t); return json(200, t); }
@@ -124,7 +124,7 @@ test('орындау: тақырып, сабақ, Meet, сақтау, жария
   for (const l of lessons) {
     assert.equal(l.published, true);
     assert.equal(l.name, 'LIVE САБАҚ №11 | НҰРЛАНОВ ЭДУАРД | 1-АҒЫМ');
-    assert.equal(l.ratingTaskType, 'LIVE_LESSON');
+    assert.equal(l.ratingTaskType, 'LIVE_SABAK');
     assert.equal(l.rating, true);
     assert.equal(l.maxScore, 25);
     assert.equal(J.htmlBold(l.description), true);
