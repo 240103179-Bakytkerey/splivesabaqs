@@ -69,6 +69,13 @@ async function fakeFetch(input, init = {}) {
     return json(200, lessonView(l));
   }
   if (method === 'PATCH' && (m = path.match(/^\/v1\/lessons\/([^/]+)\/publish$/))) { const l = db.lessons[m[1]]; l.published = url.searchParams.get('publish') === 'true'; return json(200, {published: l.published}); }
+  if (method === 'GET' && path === '/v1/headteacher/subjects') return json(200, [{id: 'subj-geo', name: 'География'}, {id: 'subj-hist', name: 'Қазақстан тарихы'}]);
+  if (method === 'GET' && (m = path.match(/^\/v1\/headteacher\/subjects\/([^/]+)\/courses$/))) {
+    // Paged like Spring: {content, totalPages}; 2 pages for География.
+    const all = m[1] === 'subj-geo' ? ['SMART-PRO | ГЕО-БИО | ГЕО | ҚАЗАН', 'SMART-PRO | ГЕО-ДЖТ | ГЕО | ҚАЗАН', 'SMART-PRO | ГЕО-БИО | ГЕО | ҚЫРКҮЙЕК'] : ['SMART-PRO | ӘДЕБ-ТІЛ | ТАРИХ | ТАМЫЗ'];
+    const page = Number(url.searchParams.get('page') || 0), size = 2;
+    return json(200, {content: all.slice(page * size, page * size + size).map((name, i) => ({id: `${m[1]}-${page * size + i}`, name})), totalPages: Math.ceil(all.length / size)});
+  }
   return json(404, {message: 'no route ' + method + ' ' + path});
 }
 
@@ -183,4 +190,12 @@ test('Meet сұрауына жауап келмесе — «Нәтиже бел�
   assert.equal(s.phase, 'uncertain');
   assert.equal(s.uncertain, true);
   assert.equal(state.jobs[jobs[1].id].phase, 'new', 'кезек тоқтауы керек');
+});
+
+test('курстар тізімі: барлық пән мен бет оқылады, тек GET', async () => {
+  const r = await J.courses(1);
+  assert.equal(r.subjects, 2);
+  assert.deepEqual(r.courses.map(c => c.name), ['SMART-PRO | ГЕО-БИО | ГЕО | ҚАЗАН', 'SMART-PRO | ГЕО-ДЖТ | ГЕО | ҚАЗАН', 'SMART-PRO | ГЕО-БИО | ГЕО | ҚЫРКҮЙЕК', 'SMART-PRO | ӘДЕБ-ТІЛ | ТАРИХ | ТАМЫЗ']);
+  assert.equal(r.courses[0].url, 'https://juz40-edu.kz/headTeacher/subjects/subj-geo/subj-geo-0');
+  assert.ok(calls.every(c => c.method === 'GET'));
 });
