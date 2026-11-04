@@ -1,6 +1,6 @@
 {
   "name": "juz40-live-site",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "JUZ40 LIVE сабақтарының жоспарлаушы сайты және оның Chrome кеңейтімі",
   "type": "module",

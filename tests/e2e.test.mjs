@@ -39,7 +39,7 @@ after(async () => { await context?.close(); server?.close(); rmSync(tmp, {recurs
 
 test('сайт кеңейтімді табады', async () => {
   await site.waitForSelector('#ext-status[data-state=connected]', {timeout: 10000});
-  assert.match(await site.textContent('#ext-status-text'), /1\.2\.0/);
+  assert.match(await site.textContent('#ext-status-text'), /1\.2\.1/);
   assert.equal(await site.isHidden('#ext-banner'), true);
 });
 
@@ -85,7 +85,7 @@ test('API режимі: «Бетті тексеру» api.juz40-edu.kz-тен о
     apiRequests.push({method: r.method(), url: r.url(), auth: r.headers().authorization});
     const path = new URL(r.url()).pathname;
     const body = path.startsWith('/v1/courses/') ? {id: path.split('/').at(-1), name: 'SMART-PRO | ИНФО-МАТ | ИНФО | ТАМЫЗ'}
-      : path.endsWith('/rating-task-types') ? [{value: 'LIVE_LESSON', nameKz: 'Live сабақ'}] : [];
+      : path.endsWith('/rating-task-types') ? ['HOMEWORK', 'LIVE_SABAK'] : [];
     route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(body)});
   });
   await juz.evaluate(() => localStorage.setItem('token', 'e2e-token'));
