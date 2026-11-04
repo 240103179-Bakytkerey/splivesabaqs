@@ -39,7 +39,7 @@ after(async () => { await context?.close(); server?.close(); rmSync(tmp, {recurs
 
 test('сайт кеңейтімді табады', async () => {
   await site.waitForSelector('#ext-status[data-state=connected]', {timeout: 10000});
-  assert.match(await site.textContent('#ext-status-text'), /1\.1\.0/);
+  assert.match(await site.textContent('#ext-status-text'), /1\.2\.0/);
   assert.equal(await site.isHidden('#ext-banner'), true);
 });
 
@@ -76,6 +76,29 @@ test('«Тексеру» кеңейтім арқылы жұмыс терезес
   assert.ok(context.pages().length > pagesBefore, 'жұмыс терезесі ашылуы керек');
   assert.ok(juzRequests.some(u => u.startsWith(COURSE)), 'курс беті ашылуы керек');
   assert.equal(await site.isHidden('#progress-section'), true);
+});
+
+test('API режимі: «Бетті тексеру» api.juz40-edu.kz-тен оқиды, ештеңе өзгертпейді', async () => {
+  const apiRequests = [];
+  await context.route('https://api.juz40-edu.kz/**', route => {
+    const r = route.request();
+    apiRequests.push({method: r.method(), url: r.url(), auth: r.headers().authorization});
+    const path = new URL(r.url()).pathname;
+    const body = path.startsWith('/v1/courses/') ? {id: path.split('/').at(-1), name: 'SMART-PRO | ИНФО-МАТ | ИНФО | ТАМЫЗ'}
+      : path.endsWith('/rating-task-types') ? [{value: 'LIVE_LESSON', nameKz: 'Live сабақ'}] : [];
+    route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(body)});
+  });
+  await juz.evaluate(() => localStorage.setItem('token', 'e2e-token'));
+  await site.selectOption('#engine', 'api');
+  await site.click('#diagnose');
+  await site.waitForSelector('#diagnose-dialog[open] #diagnose-list li');
+  const text = await site.inputValue('#diagnose-text');
+  assert.match(text, /✓ JUZ40 сессиясы/);
+  assert.match(text, /✓ «Live сабақ» тапсырма тегі/);
+  assert.ok(apiRequests.length > 0, 'API-ге сұрау жіберілуі керек');
+  assert.ok(apiRequests.every(r => r.method === 'GET' && r.auth === 'Bearer e2e-token'));
+  await site.click('#diagnose-dialog [data-close]');
+  await site.selectOption('#engine', 'page');
 });
 
 test('консольде қате жоқ', () => { assert.deepEqual(errors, []); });

@@ -5,7 +5,7 @@ const M=LiveModel,Ext=LiveExtension,$=id=>document.getElementById(id);
 const STORAGE_KEY='juz40-live-site-v1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icons=()=>globalThis.lucide?.createIcons();
-let state={schema:1,settings:M.defaults(),rows:[],catalog:structuredClone(LiveCourses.courses),jobs:{},logs:[],active:false};
+let state={schema:1,settings:M.defaults(),rows:[],catalog:structuredClone(LiveCourses.courses),jobs:{},logs:[],active:false,engine:'page'};
 let runner,editingId=null,editingCourse=null,view='schedule',pendingJobs=[],targetId=null,tabs=[];
 const readStore=()=>{try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;}};
 const persist=async()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){notify('Браузер деректерді сақтай алмады: '+e.message,true);}};
@@ -36,7 +36,7 @@ function renderReview(){
     return `<article class="job card phase-${esc(s.phase)}"><div class="job-head"><div><h3>${esc(j.course.name)}</h3><small>${esc(j.task.title)} · ${esc(j.task.date)} ${esc(j.task.start)}–${esc(j.task.end)}</small></div><span class="badge ${esc(s.phase)}">${esc(s.skip?'Өткізіледі':phaseName(s))}</span></div><p class="job-detail">${esc(s.error||s.detail||'')}</p>${s.mustRepublish?'<p class="badge error">Сабақ жариялаудан алынған. Қайта жариялау қажет.</p>':''}<div class="job-links">${s.lessonUrl?`<a href="${esc(s.lessonUrl)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i>Сабақты ашу</a>`:''}${s.link?`<a href="${esc(s.link)}" target="_blank" rel="noopener"><i data-lucide="video"></i>${esc(s.link)}</a>`:''}</div>${changes?`<div class="table-wrap"><table class="differences"><thead><tr><th></th><th>Өріс</th><th>Сайтта</th><th>Жоспарда</th></tr></thead><tbody>${changes}</tbody></table></div>`:''}${['new','incomplete','ready','review'].includes(s.phase)?`<label class="check"><input type="checkbox" data-skip="${esc(j.id)}" ${s.skip?'checked':''}>Бұл курсты өткізу</label>`:''}${s.phase==='uncertain'?`<div class="actions"><button data-recover="${esc(j.id)}"><i data-lucide="scan-eye"></i>Ашық бетті тексеру</button><button data-release="${esc(j.id)}"><i data-lucide="user-check"></i>Сайттан қолмен тексердім</button></div>`:''}</article>`;}).join('');
 }
 function render(){
-  renderSchedule();renderReview();
+  renderSchedule();renderReview();$('engine').value=state.engine==='api'?'api':'page';$('engine').disabled=!!runner?.running;
   const records=currentJobs().map(j=>status(j).record).filter(Boolean);$('report').value=M.report(records);$('result-count').textContent=records.length;$('copy-report').disabled=!$('report').value;$('download-report').disabled=!$('report').value;
   const running=runner?.running||false;const jobs=currentJobs(),active=jobs.map(j=>status(j)).find(s=>s.phase==='running');
   $('progress-section').hidden=!running;$('progress-section').classList.toggle('running',running);$('progress-label').textContent=running?'Орындалып жатыр':'Кезек тоқтаған';$('progress-detail').textContent=active?.detail||state.logs.at(-1)?.text||'';$('progress-count').textContent=jobs.filter(j=>status(j).phase==='done').length+' / '+jobs.length+' жарияланды';$('progress').max=Math.max(1,jobs.length);$('progress').value=jobs.filter(j=>status(j).phase==='done').length;$('stop').disabled=!running;
@@ -73,10 +73,20 @@ async function refreshTabs(){
 function connect(){if(!Ext.info)throw Error('Сайтта орындау үшін JUZ40 LIVE кеңейтімі керек. «Кеңейтім» бөліміндегі нұсқаулықты қараңыз.');if(!targetId)throw Error('Жоғарыдағы тізімнен ашық JUZ40 бетін таңдаңыз (JUZ40 аккаунтына кіріп, курс бетін ашыңыз).');return targetId;}
 // Each limit is longer than the extension's own wait for that step, so the extension answers first.
 const callLimits={open:240000,createMeet:240000,attach:240000,fillNotes:150000,patch:180000,save:120000,publish:120000,unpublish:120000,snapshot:120000};
-const adapter={
+// «Бет арқылы»: кеңейтім JUZ40 жеке терезесінде бетті басқарады (1.0.5 тәсілі).
+const pageAdapter={
   async navigate(url,{reload=false}={}){await Ext.request('navigate',{url,reload,sourceTabId:connect()},120000);},
   async call(action,payload){return Ext.request('call',{action,payload,sourceTabId:connect()},(callLimits[action]||95000)+20000);}
 };
+// «API арқылы» (1.2.0, сынақ): сол әрекеттерді кеңейтім juz40-edu.kz API-і арқылы орындайды, терезе ашылмайды.
+// «Бетті ашу» мұнда тек мекенжайды есте сақтайды: келесі әрекет сол курс немесе сабақпен жұмыс істейді.
+let apiAt=null;
+const apiAdapter={
+  async navigate(url){apiAt=url;},
+  async call(action,payload){const r=await Ext.request('api',{action,payload:{...payload,at:apiAt},sourceTabId:connect()},(callLimits[action]||95000)+20000);if(r?.lessonUrl)apiAt=r.lessonUrl;return r;}
+};
+const engine=()=>state.engine==='api'?apiAdapter:pageAdapter;
+const adapter={navigate:(...a)=>engine().navigate(...a),call:(...a)=>engine().call(...a)};
 async function run(mode,jobs){
   notify('');connect();
   const start=async()=>{log(mode==='scan'?'Тексеру басталды':'Орындау басталды');setView('review');await runner.run(jobs||currentPlan(),mode);log('Кезек аяқталды немесе тоқтады');await persist();render();};
@@ -108,7 +118,8 @@ async function init(){
   $('ext-status').onclick=()=>setView('extension');
   $('refresh').onclick=guard(refreshTabs);
   $('browser-tab').onchange=()=>{targetId=Number($('browser-tab').value)||null;};
-  $('diagnose').onclick=guard(async()=>{notify('');showDiagnosis(await Ext.request('diagnose',{tabId:connect()},60000));});
+  $('diagnose').onclick=guard(async()=>{notify('');showDiagnosis(await Ext.request(state.engine==='api'?'apiDiagnose':'diagnose',{tabId:connect()},60000));});
+  $('engine').onchange=guard(async()=>{if(runner.running){$('engine').value=state.engine;throw Error('Кезек орындалып жатыр.');}state.engine=$('engine').value==='api'?'api':'page';apiAt=null;await persist();renderExtension();notify(state.engine==='api'?'API режимі (сынақ): әрекеттер juz40-edu.kz API-і арқылы, жеке терезесіз орындалады. Алдымен «Бетті тексеру», сосын «Тексеру» (тек оқиды).':'Бет режимі: кеңейтім JUZ40 жеке терезесінде бетті басқарады.');});
   $('copy-diagnose').onclick=guard(async()=>{await navigator.clipboard.writeText($('diagnose-text').value);$('diagnose-summary').textContent+=' Мәтін көшірілді.';});
   $('focus-work').onclick=guard(()=>Ext.request('focusWorkTab'));
   $('stream-filter').onchange=render;$('subject-filter').onchange=render;
@@ -129,7 +140,7 @@ async function init(){
   $('stop').onclick=()=>{runner.stop();if(!runner.finishingLesson)Ext.request('stopNavigation').catch(()=>{});notify('Ағымдағы сабақ сақталып, жарияланған соң тоқтайды.');};
   $('review-list').onchange=guard(async e=>{if(runner.running)return;const {job,field,skip}=e.target.dataset;if(job&&field){const s=state.jobs[job];s.selected=e.target.checked?[...new Set([...(s.selected||[]),field])]:(s.selected||[]).filter(k=>k!==field);}if(skip)state.jobs[skip].skip=e.target.checked;await persist();render();});
   $('review-list').onclick=guard(async e=>{const b=e.target.closest('[data-recover]'),r=e.target.closest('[data-release]');
-    if(b){connect();const job=currentJobs().find(j=>j.id===b.dataset.recover);if(!job)throw Error('Жоспар өзгерген. Сабақты қайта тексеріңіз.');await runner.recover(job);render();}
+    if(b){connect();const job=currentJobs().find(j=>j.id===b.dataset.recover);if(!job)throw Error('Жоспар өзгерген. Сабақты қайта тексеріңіз.');if(state.engine==='api')apiAt=state.jobs[job.id]?.lessonUrl||apiAt;await runner.recover(job);render();}
     if(r){const job=currentJobs().find(j=>j.id===r.dataset.release);if(!job)throw Error('Жоспар өзгерген. Сабақты қайта тексеріңіз.');if(!confirm('Сайттағы сабақты өзіңіз тексердіңіз бе?\n\nMeet құрылып, бірақ сабақ сақталмаған болса, алдымен сайтта сақтаңыз. Әйтпесе келесі орындауда жаңа Meet құрылады.\n\nБұдан кейін сабақ қайта тексеріледі.'))return;await runner.release(job);render();}});
   $('execute').onclick=guard(async()=>{connect();pendingJobs=currentPlan().filter(j=>{const s=status(j);return !s.skip&&(['new','incomplete','ready','resume'].includes(s.phase)||s.phase==='review'&&s.selected?.length);});if(!pendingJobs.length)throw Error('Жаңа сабақ немесе түзетілетін өріс таңдалмаған. Алдымен «Тексеру» басыңыз.');
     $('confirm-summary').innerHTML=pendingJobs.map(j=>{const s=status(j);const what=s.phase==='new'?'Жаңа сабақ':s.phase==='incomplete'?'Meet құрып, аяқтау':s.selected?.map(k=>M.fieldLabels[k]).join(', ')||'Сақтау / жариялау';return `<li><strong>${esc(j.course.name)}</strong><span>${esc(j.task.date)} ${esc(j.task.start)} · ${esc(what)}</span></li>`;}).join('');
