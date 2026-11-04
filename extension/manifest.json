@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "JUZ40 LIVE жоспарлаушы",
+  "version": "1.1.0",
+  "version_name": "1.1.0-preview",
+  "description": "JUZ40 LIVE сайтының көмекшісі: сайттан келген кезекті juz40-edu.kz бетінде орындайды.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["https://juz40-edu.kz/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_title": "JUZ40 LIVE сайтын ашу"},
+  "icons": {"128": "icon-128.png"},
+  "content_scripts": [
+    {
+      "matches": ["https://splivesabaqs.vercel.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

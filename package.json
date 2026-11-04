@@ -1,0 +1,13 @@
+{
+  "name": "juz40-live-site",
+  "version": "1.1.0",
+  "private": true,
+  "description": "JUZ40 LIVE сабақтарының жоспарлаушы сайты және оның Chrome кеңейтімі",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {"node": ">=18"}
+}

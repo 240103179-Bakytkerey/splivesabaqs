@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JUZ40 LIVE жоспарлаушы</title>
+  <meta name="description" content="JUZ40 әдіскерлеріне арналған LIVE сабақтарының жоспарлаушысы.">
+  <meta name="theme-color" content="#00998A">
+  <link rel="icon" href="mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="vendor/lucide.min.js"></script>
+  <script defer src="js/courses.js"></script>
+  <script defer src="js/model.js"></script>
+  <script defer src="js/runner.js"></script>
+  <script defer src="js/connector.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="JUZ40 LIVE">
+      <img src="mark.svg" width="36" height="36" alt="">
+      <span><strong>JUZ40 <em>LIVE</em></strong><small>Сабақ жоспарлаушысы</small></span>
+    </a>
+    <div class="connection">
+      <button id="ext-status" class="pill" data-state="checking" title="Кеңейтім күйі"><span class="dot"></span><span id="ext-status-text">Кеңейтім тексерілуде…</span></button>
+      <select id="browser-tab" aria-label="JUZ40 беті" disabled></select>
+      <button id="refresh" class="icon" title="JUZ40 беттерін жаңарту" aria-label="JUZ40 беттерін жаңарту"><i data-lucide="refresh-cw"></i></button>
+      <button id="diagnose" title="Таңдалған JUZ40 бетінде қажетті өрістердің табылатынын тексереді. Ештеңе өзгертілмейді."><i data-lucide="stethoscope"></i><span>Бетті тексеру</span></button>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Бөлімдер">
+    <button data-view="schedule" aria-current="page"><i data-lucide="calendar-range"></i>Кесте <span id="row-count">0</span></button>
+    <button data-view="review"><i data-lucide="list-checks"></i>Тексеру <span id="review-count">0</span></button>
+    <button data-view="results"><i data-lucide="link"></i>Сілтемелер <span id="result-count">0</span></button>
+    <button data-view="settings"><i data-lucide="sliders-horizontal"></i>Баптаулар</button>
+    <button data-view="courses"><i data-lucide="library"></i>Курстар</button>
+    <button data-view="extension"><i data-lucide="puzzle"></i>Кеңейтім</button>
+  </nav>
+
+  <main>
+    <div id="ext-banner" class="banner" hidden>
+      <i data-lucide="plug-zap"></i>
+      <div><strong>Кеңейтім қосылмаған.</strong> Кестені дайындауға, баптауларға және курстарға кеңейтімсіз де болады. Сайтта тексеру мен орындау үшін JUZ40 LIVE кеңейтімін орнатыңыз.</div>
+      <button data-goto="extension" class="primary">Орнату</button>
+    </div>
+    <div id="notice" role="status" hidden></div>
+
+    <section id="progress-section" class="progress-card" hidden aria-live="polite">
+      <div class="progress-heading"><span class="spinner" aria-hidden="true"></span><strong id="progress-label">Дайын</strong><span id="progress-count"></span><button id="focus-work" title="JUZ40 жұмыс терезесін көрсету"><i data-lucide="app-window"></i><span>Терезе</span></button><button id="stop"><i data-lucide="pause"></i><span>Тоқтату</span></button></div>
+      <progress id="progress" value="0" max="1"></progress>
+      <p id="progress-detail"></p>
+    </section>
+
+    <section id="view-schedule" class="view">
+      <div class="toolbar">
+        <div><h1>Сабақ кестесі</h1><p class="lead">Аптаның LIVE сабақтарын енгізіңіз, сосын «Тексеру» сайттағы сабақтармен салыстырады.</p></div>
+        <div class="actions"><button id="add-row"><i data-lucide="plus"></i>Сабақ</button><button id="open-import"><i data-lucide="clipboard-paste"></i>Мәтіннен енгізу</button><button id="scan" class="primary"><i data-lucide="scan-search"></i>Тексеру</button></div>
+      </div>
+      <div class="filters"><select id="stream-filter" aria-label="Ағым сүзгісі"></select><select id="subject-filter" aria-label="Пән сүзгісі"></select><button id="shift-dates"><i data-lucide="calendar-days"></i>Күндерді жылжыту</button><button id="next-week"><i data-lucide="copy-plus"></i>Келесі аптаға көшіру</button><button id="delete-selected" class="danger-text"><i data-lucide="trash-2"></i>Таңдалғанды жою</button><span id="validation-count"></span></div>
+      <div class="card table-wrap"><table class="schedule"><thead><tr><th><input id="select-all" type="checkbox" aria-label="Барлық сабақты таңдау"></th><th>Сабақ / мұғалім</th><th>Ағым / кезең</th><th>Күн / уақыт</th><th>Курстар</th><th>Күйі</th><th></th></tr></thead><tbody id="schedule-body"></tbody></table>
+        <div id="empty-schedule" class="empty"><i data-lucide="calendar-plus"></i><p>Кесте әлі енгізілмеген</p><div class="actions"><button data-action="import" class="primary"><i data-lucide="clipboard-paste"></i>Мәтіннен енгізу</button><button data-action="add"><i data-lucide="plus"></i>Қолмен қосу</button></div></div>
+      </div>
+    </section>
+
+    <section id="view-review" class="view" hidden>
+      <div class="toolbar">
+        <div><h1>Тексеру нәтижесі</h1><p class="lead">Әр курс бойынша сайттағы күйі. Түзетілетін өрістерді таңдап, «Орындау» басыңыз.</p></div>
+        <div class="actions"><button id="rescan"><i data-lucide="refresh-cw"></i>Қайта тексеру</button><button id="execute" class="primary"><i data-lucide="play"></i>Таңдалғанын орындау</button></div>
+      </div>
+      <div id="review-summary" class="summary"></div>
+      <div id="review-list"></div>
+      <div id="empty-review" class="empty card"><i data-lucide="scan-search"></i><p>Тексеру нәтижесі жоқ. Кестеде сабақтарды таңдап, «Тексеру» басыңыз.</p></div>
+    </section>
+
+    <section id="view-results" class="view" hidden>
+      <div class="toolbar">
+        <div><h1>LIVE сілтемелері</h1><p class="lead">Жарияланған және тексерілген сабақтардың Meet сілтемелері.</p></div>
+        <div class="actions"><button id="copy-report" class="primary"><i data-lucide="copy"></i>Көшіру</button><button id="download-report" class="icon" aria-label="Мәтінді жүктеу" title="Мәтінді жүктеу"><i data-lucide="download"></i></button></div>
+      </div>
+      <textarea id="report" class="card" readonly aria-label="LIVE сілтемелерінің мәтіні" rows="18" placeholder="Сабақтар жарияланған соң сілтемелер осында шығады."></textarea>
+      <details class="card journal"><summary>Әрекеттер журналы</summary><ol id="journal"></ol></details>
+    </section>
+
+    <section id="view-settings" class="view" hidden>
+      <div class="toolbar"><div><h1>Баптаулар</h1><p class="lead">Жаңа сабақтарға қолданылатын мәндер. Бұл браузерде ғана сақталады.</p></div><button id="save-settings" class="primary"><i data-lucide="save"></i>Сақтау</button></div>
+      <form id="settings-form" class="card pad">
+        <div class="settings-grid"><label>Кесте жылы<input name="year" type="number" min="2020" max="2100" required></label><label>Апта<input name="week" type="number" min="1" max="4" required></label><label class="wide">Ұйымдастырушы email-і<input name="email" type="email" required></label><label>Қатысым баллы<input name="attendance" type="number" min="0" max="1000" required></label><label>Шектік қатысым, %<input name="percent" type="number" min="0" max="100" required></label><label>Конспект баллы<input name="points" type="number" min="0" max="1000" required></label><label>Дедлайн, күннен кейін<input name="deadlineDays" type="number" min="0" max="365" required></label><label>Дедлайн уақыты<input name="deadlineTime" type="time" required></label></div>
+        <h2>Ағымдар</h2><div id="stream-settings"></div><button type="button" id="add-stream"><i data-lucide="plus"></i>Ағым қосу</button>
+        <h2>Пәннің оқу айына түзету</h2><div id="offsets" class="settings-grid"></div>
+        <h2>Нұсқаулық</h2><p class="hint"><code>{пән}</code> орнына сабақтың пәні қойылады.</p><textarea name="instruction" rows="14" aria-label="Нұсқаулық" required></textarea>
+        <label class="check"><input id="apply-defaults" type="checkbox">Таңдалған кесте жолдарына да қолдану</label>
+      </form>
+      <div class="card pad backup">
+        <div><h2>Резервтік көшірме</h2><p class="hint">Кесте, баптаулар мен курстарды JSON файлға сақтаңыз немесе әріптесіңізге жіберіңіз. 1.0.5 кеңейтімінің көшірмесі де ашылады.</p></div>
+        <div class="actions"><button id="backup"><i data-lucide="download"></i>Көшірмені жүктеу</button><label class="file-button"><i data-lucide="upload"></i>Көшірмені ашу<input id="restore" type="file" accept="application/json,.json"></label></div>
+      </div>
+    </section>
+
+    <section id="view-courses" class="view" hidden>
+      <div class="toolbar"><div><h1>Курстар</h1><p class="lead">Кесте жолдары осы каталог бойынша курстарға байланады.</p></div><button id="add-course" class="primary"><i data-lucide="plus"></i>Курс қосу</button></div>
+      <input id="course-search" type="search" placeholder="Курсты іздеу" aria-label="Курсты іздеу">
+      <div id="course-list" class="card"></div>
+    </section>
+
+    <section id="view-extension" class="view" hidden>
+      <div class="toolbar"><div><h1>JUZ40 LIVE кеңейтімі</h1><p class="lead">Сайт кестені басқарады, ал juz40-edu.kz бетіндегі әрекеттерді Chrome кеңейтімі орындайды.</p></div></div>
+      <div class="ext-grid">
+        <div class="card pad">
+          <div id="ext-card-status" class="ext-status" data-state="checking"><i data-lucide="puzzle"></i><div><strong id="ext-card-title">Тексерілуде…</strong><small id="ext-card-detail"></small></div></div>
+          <ol class="steps">
+            <li><strong>Кеңейтімді жүктеп алыңыз</strong><span>Архивті ашып, қалтасын тұрақты жерге қойыңыз (мысалы, «Құжаттар»).</span><a class="button primary" href="downloads/juz40-live-extension.zip" download><i data-lucide="download"></i>Кеңейтімді жүктеу (.zip)</a></li>
+            <li><strong>Chrome-да әзірлеуші режимін қосыңыз</strong><span>Мекенжай жолына <code>chrome://extensions</code> жазып, оң жақ жоғарыдағы «Режим разработчика» ауыстырғышын қосыңыз.</span></li>
+            <li><strong>«Распакованное расширение»-ні басыңыз</strong><span>Ішінде <code>manifest.json</code> тұрған қалтаны таңдаңыз.</span></li>
+            <li><strong>Ескі нұсқаны өшіріңіз</strong><span>1.0.5 немесе 0.8.3 кеңейтімі орнатылса, оны өшіріп қойыңыз. Алдымен 1.0.5-тегі «Резервтік көшірме»-ні жүктеп, осы сайттағы «Баптаулар → Көшірмені ашу» арқылы ашуға болады.</span></li>
+            <li><strong>Бетті қайта жүктеңіз</strong><span>JUZ40 аккаунтына кіріп, курс бетін ашыңыз. Сосын осы сайтта жоғарыдан сол бетті таңдаңыз.</span></li>
+          </ol>
+        </div>
+        <div class="card pad">
+          <h2>Қалай жұмыс істейді</h2>
+          <ul class="facts">
+            <li><i data-lucide="monitor"></i><span><strong>Сайт</strong> — кесте, тексеру нәтижесі, баптаулар, курстар, сілтемелер. Деректер осы браузерде сақталады.</span></li>
+            <li><i data-lucide="puzzle"></i><span><strong>Кеңейтім</strong> — JUZ40-та жеке терезе ашады, сабақты іздейді, Meet құрады, сақтайды, жариялайды және қайта ашып тексереді.</span></li>
+            <li><i data-lucide="shield-check"></i><span>Кеңейтім тек осы сайттың командасын қабылдайды. Аккаунт паролі ешқайда жіберілмейді: жұмыс сіздің ашық JUZ40 сессияңызда жүреді.</span></li>
+            <li><i data-lucide="app-window"></i><span>Кезек жүріп жатқанда JUZ40 терезесін кішірейтпеңіз және басқа тереземен толық жаппаңыз: Chrome жасырын беттерді баяулатады.</span></li>
+            <li><i data-lucide="flask-conical"></i><span>Бұл — сынақ нұсқасы. «Орындау»-ды алдымен сынақ сабағында, қадағалап отырып басыңыз.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">JUZ40 LIVE · сайт <span id="site-version">1.1.0</span> · деректер тек осы браузерде сақталады</footer>
+
+  <dialog id="import-dialog"><div class="modal-head"><h2>Кесте мәтіні</h2><button data-close="import-dialog" class="icon" title="Жабу" aria-label="Жабу"><i data-lucide="x"></i></button></div><div class="settings-grid"><label>Ағым<select id="import-stream"></select></label><label>Күні<input id="import-date" type="date"></label><label>Жылы<input id="import-year" type="number" min="2020" max="2100"></label></div><textarea id="import-text" rows="14" aria-label="Кесте мәтіні" placeholder="22.10 | SP-1&#10;ИНФО-МАТ&#10;ПӘН: ИНФО&#10;МҰҒАЛІМ: НҰРЛАНОВ ЭДУАРД&#10;ПОТОК: 1&#10;УАҚЫТЫ: 16:40-18:10"></textarea><div id="import-errors" role="alert"></div><div class="dialog-actions"><button data-close="import-dialog">Бас тарту</button><button id="parse-import" class="primary"><i data-lucide="list-plus"></i>Кестеге қосу</button></div></dialog>
+  <dialog id="edit-dialog"><div class="modal-head"><h2>Сабақ</h2><button data-close="edit-dialog" class="icon" title="Жабу" aria-label="Жабу"><i data-lucide="x"></i></button></div><form id="row-form"><div id="row-fields" class="settings-grid"></div><h3>Курстар</h3><div id="row-courses"></div><h3>Баптаулар</h3><div id="row-options" class="settings-grid"></div><div class="dialog-actions"><button type="button" data-close="edit-dialog">Бас тарту</button><button type="submit" class="primary"><i data-lucide="save"></i>Сақтау</button></div></form></dialog>
+  <dialog id="confirm-dialog"><div class="modal-head"><h2>Орындау</h2><button data-close="confirm-dialog" class="icon" title="Жабу" aria-label="Жабу"><i data-lucide="x"></i></button></div><p class="hint">Кеңейтім JUZ40 сайтында төмендегі сабақтарды өзгертеді: Meet құрады, сақтайды және жариялайды.</p><ul id="confirm-summary" class="confirm-list"></ul><p id="republish-note" class="warn" hidden>Таңдалған жарияланған сабақтар уақытша жариялаудан алынады, түзетіліп, қайта жарияланады.</p><div class="dialog-actions"><button data-close="confirm-dialog">Бас тарту</button><button id="confirm-run" class="primary"><i data-lucide="play"></i>Орындау</button></div></dialog>
+  <dialog id="course-dialog"><div class="modal-head"><h2>Курс</h2><button data-close="course-dialog" class="icon" title="Жабу" aria-label="Жабу"><i data-lucide="x"></i></button></div><form id="course-form"><label>Атауы<input name="name" required></label><label>Сілтемесі<input name="url" type="url" required placeholder="https://juz40-edu.kz/methodist/course/…"></label><label>Ағым<select name="stream"></select></label><label>Бағыт<input name="direction" required placeholder="ИНФО-МАТ"></label><fieldset id="course-subjects"><legend>Пәндер</legend></fieldset><div class="dialog-actions"><button type="button" id="delete-course" class="danger-text"><i data-lucide="trash-2"></i>Жою</button><button type="submit" class="primary"><i data-lucide="save"></i>Сақтау</button></div></form></dialog>
+  <dialog id="diagnose-dialog"><div class="modal-head"><h2>Бет тексеруі</h2><button data-close="diagnose-dialog" class="icon" title="Жабу" aria-label="Жабу"><i data-lucide="x"></i></button></div><p id="diagnose-summary"></p><ul id="diagnose-list" class="checks"></ul><details><summary>Мәтін түрінде</summary><textarea id="diagnose-text" rows="10" readonly aria-label="Тексеру мәтіні"></textarea></details><div class="dialog-actions"><button id="copy-diagnose" class="primary"><i data-lucide="copy"></i>Мәтінді көшіру</button></div></dialog>
+</body>
+</html>
