@@ -39,7 +39,7 @@ after(async () => { await context?.close(); server?.close(); rmSync(tmp, {recurs
 
 test('сайт кеңейтімді табады', async () => {
   await site.waitForSelector('#ext-status[data-state=connected]', {timeout: 10000});
-  assert.match(await site.textContent('#ext-status-text'), /1\.2\.1/);
+  assert.match(await site.textContent('#ext-status-text'), /1\.2\.2/);
   assert.equal(await site.isHidden('#ext-banner'), true);
 });
 

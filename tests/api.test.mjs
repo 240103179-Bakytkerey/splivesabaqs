@@ -63,7 +63,8 @@ async function fakeFetch(input, init = {}) {
   if (method === 'PUT' && (m = path.match(/^\/v1\/lessons\/practics\/meetings\/([^/]+)$/))) { const x = db.meetings[m[1]]; Object.assign(x, {...body, startDate: naive(body.startDate), endDate: naive(body.endDate), ...(body.deadline ? {deadline: naive(body.deadline)} : {})}); return json(200, {}); }
   if (method === 'POST' && (m = path.match(/^\/v1\/lessons\/practics\/meetings\/([^/]+)\/links$/))) {
     const src = db.meetings[m[1]], l = db.lessons[body.lessonId], srcLesson = Object.values(db.lessons).find(x => x.meetingIds.includes(src.id));
-    const link = {...src, id: uuid(), sourceMeetingId: src.id, sourceLesson: {id: srcLesson.id, name: srcLesson.name}, groupIds: body.groupIds, deadline: naive(body.deadline)};
+    // As on the real server (05.11.2026): a linked meeting is named after the source lesson.
+    const link = {...src, name: srcLesson.name, id: uuid(), sourceMeetingId: src.id, sourceLesson: {id: srcLesson.id, name: srcLesson.name}, groupIds: body.groupIds, deadline: naive(body.deadline)};
     db.meetings[link.id] = link; l.meetingIds.push(link.id);
     return json(200, lessonView(l));
   }
