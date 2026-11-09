@@ -92,3 +92,41 @@ test('курстарды JUZ40-тан жүктеу: атауынан ағым, �
   const row = M.makeRow(settings, {stream: 'oct', subject: 'geo', directions: M.directions('ГЕО-БИО')});
   assert.deepEqual(M.matches(row, [...C.courses, ...r.added]).map(c => c.name), ['SMART-PRO | ГЕО-БИО | ГЕО | ҚАЗАН']);
 });
+
+test('«КОМБИНАЦИЯ:» жолы (ПӘН-нен бұрын да, кейін де), бос орынмен бөлінген кодтар, @-жолдар', () => {
+  const text = `🎙 13.11 | SP-2 АУЫЗША/ЖАЗБАША ПӘН LIVE САБАҚ СІЛТЕМЕЛЕРІ
+
+КОМБИНАЦИЯ: ИМ, ГМ
+📜 ПӘН: ТАРИХ
+МҰҒАЛІМ: ӘДІЛЕТ АҒАЙ
+ПОТОК: 1
+УАҚЫТЫ: 15:00-16:00
+
+📜 ПӘН: ТАРИХ
+МҰҒАЛІМ: ӘДІЛЕТ АҒАЙ
+ПОТОК: 1
+УАҚЫТЫ: 16:10-17:10
+КОМБИНАЦИЯ: ӘТ РЛ ДАТ
+
+КОМБИНАЦИЯ: ДАА ФМ ДҚ БГ, ГА
+ПӘН: ҚАЗАҚСТАН ТАРИХЫ
+МҰҒАЛІМ: ӘДІЛЕТ АҒАЙ
+ПОТОК: 1
+УАҚЫТЫ: 17:20-18:20
+мұғаліміміз: @adilet_tarih 🎩`;
+  const {rows, warnings} = M.parse(text, settings);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(rows.map(r => r.directions), [['ИНФОМАТ', 'ГЕОМАТ'], ['ӘДЕБТІЛ', 'РУСЛИТ', 'ДЖТАНГЛTOEFL'], ['ДЖТАНГЛIELTS', 'ФИЗМАТ', 'ДЖТҚҰҚЫҚ', 'ГЕОБИО', 'ГЕОАНГЛ', 'ГЕОАНГЛIELTS']]);
+  assert.ok(rows.every(r => r.subject === 'hist' && r.stream === 'sep' && r.month === 2));
+  // Every code finds its course of that stream (катaлогқа ТАРИХ курстары қосылған деп алынады).
+  const sid = '11111111-1111-4111-8111-111111111111';
+  const dirs = ['ИНФО-МАТ', 'ГЕО-МАТ', 'ӘДЕБ-ТІЛ', 'РУС-ЛИТ', 'ДЖТ-АНГЛ TOEFL', 'ДЖТ-АНГЛ IELTS', 'ФИЗ-МАТ', 'ДЖТ-ҚҰҚЫҚ', 'ГЕО-БИО', 'ГЕО-АНГЛ IELTS'];
+  const {added} = C.fromJuz(dirs.map((d, i) => ({id: `bbbbbbbb-0000-4000-8000-${String(i).padStart(12, '0')}`, name: `SMART-PRO | ${d} | ТАРИХ | ҚЫРКҮЙЕК`, url: `https://juz40-edu.kz/headTeacher/subjects/${sid}/bbbbbbbb-0000-4000-8000-${String(i).padStart(12, '0')}`})), settings, [], M);
+  assert.deepEqual(rows.map(r => M.matches(r, added).length), [2, 3, 5]);
+});
+
+test('ескі пішім өзгерген жоқ: бағыттар жеке жолда', () => {
+  const {rows, warnings} = M.parse('22.10 | SP-1\nИНФО-МАТ, ФИЗ-МАТ\nПӘН: МАТ\nМҰҒАЛІМ: А Б\nПОТОК: 1\nУАҚЫТЫ: 16:40-18:10\nЖАУАПТЫ: @x', settings);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(rows[0].directions, ['ИНФОМАТ', 'ФИЗМАТ']);
+});
