@@ -12,8 +12,12 @@
   const clean = value => String(value ?? '').replace(/[\u200b-\u200f\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
   const norm = value => clean(value).toLocaleUpperCase('kk');
   const direction = value => norm(value).replace(/[\s\-–—]/g, '');
-  const aliases = {ИМ:'ИНФОМАТ',ФМ:'ФИЗМАТ',ГМ:'ГЕОМАТ',БХ:'БИОХИМ',ФХ:'ФИЗХИМ',ГБ:'ГЕОБИО',ГД:'ГЕОДЖТ',ӘТ:'ӘДЕБТІЛ',РЛ:'РУСЛИТ',ДҚ:'ДЖТҚҰҚЫҚ',ГА:'ГЕОАНГЛ'};
-  const directions = value => String(value).split(/[,;]/).map(direction).map(v => aliases[v] || v).filter(Boolean);
+  // Short combination codes used in the link messages («КОМБИНАЦИЯ: ИМ, ГМ»). A code may stand for several catalogue
+  // spellings of the same direction (ГЕО-АНГЛ in one stream, ГЕО-АНГЛ IELTS in another).
+  // 1.3.1: ДАА = ДЖТ-АНГЛ IELTS, ДАТ = ДЖТ-АНГЛ TOEFL, БГ = ГЕО-БИО (as ГБ).
+  const aliases = {ИМ:['ИНФОМАТ'],ФМ:['ФИЗМАТ'],ГМ:['ГЕОМАТ'],БХ:['БИОХИМ'],ФХ:['ФИЗХИМ'],ГБ:['ГЕОБИО'],БГ:['ГЕОБИО'],ГД:['ГЕОДЖТ'],ӘТ:['ӘДЕБТІЛ'],РЛ:['РУСЛИТ'],ДҚ:['ДЖТҚҰҚЫҚ'],ГА:['ГЕОАНГЛ','ГЕОАНГЛIELTS'],ДАА:['ДЖТАНГЛIELTS'],ДАТ:['ДЖТАНГЛTOEFL']};
+  // Parts are separated by commas; a part made only of short codes may also be separated by spaces («ӘТ РЛ ДАТ»).
+  const directions = value => String(value).split(/[,;]/).flatMap(part => { const words=clean(part).split(' ').map(direction); return words.length>1&&words.every(w=>aliases[w]) ? words : [direction(part)]; }).flatMap(v => aliases[v] || [v]).filter(Boolean);
   const subjectAliases = {...Object.fromEntries(Object.entries(codes).map(([k,v]) => [v, k])),...Object.fromEntries(Object.entries(extraNames).flatMap(([k,list]) => list.map(v => [norm(v), k]))),...Object.fromEntries(Object.entries(subjects).map(([k,v]) => [norm(v), k]))};
   const template = `Сәлем, жас түлек!\n\nНазарыңа {пән} пәнінен LIVE сабақты ұсынамыз.\n\nLIVE САБАҚТЫ ҚАРАУ ЕРЕЖЕЛЕРІ:\n\n1. Камера қосып, маскасыз отырыңыз\n2. Сабақты мұқият қарап, тақырыпты толық түсінуге тырысыңыз.\n3. Маңызды ақпараттарды жазып алып, қиын тұстарын қайта қарап шығыңыз.\n4. Чат тәртібін сақтаңыз\n5. Сұрақтар туындаса, міндетті түрде қойыңыз - бұл сіздің нәтижеңізге тікелей әсер етеді\n\nЕСКЕРТУ:\nСабақты толық меңгермей, келесі тақырыпқа өтпеңіз.\nCӘТТІЛІК! ГРАНТ ЖАҒАСЫНА БІЗБЕН БІРГЕ JUZ!`;
   function defaults() { return {year:new Date().getFullYear(), email:'smartpro_esep@juz40onl.com', emailAuyzsha:'smartpro_auyzsha@juz40onl.com', week:3, attendance:30, percent:70, points:25, deadlineDays:1, deadlineTime:'23:59', instruction:template, offsets:{math:0,ms:-1,geometry:-1,physics:0,chemistry:0,info:0,geo:0,wh:0,bio:0,kazlit:0,kaz:0,hist:-1,rus:0,ruslit:0,law:0}, streams:[{id:'aug',code:'SP-1',name:'Тамыз',month:4,number:11},{id:'sep',code:'SP-2',name:'Қыркүйек',month:3,number:7},{id:'oct',code:'SP-3',name:'Қазан',month:2,number:3}]}; }
@@ -35,17 +39,20 @@
       if(/^\d{1,2}\.\d{1,2}(?:\.|\b)/.test(line)){const target=row||context;target.date=dateFrom(line,settings.year);const month=line.match(/(\d+)\s*[-–]?\s*ай/i),week=line.match(/(\d+)\s*[-–]?\s*апта/i);if(month)target.month=Number(month[1]);if(week)target.week=Number(week[1]);continue;}
       const directionStream=line.match(/^([А-ЯӘІҢҒҮҰҚӨҺ]+)\s*[-–]\s*(\d+)$/i);
       if(directionStream){const stream=settings.streams.find(s=>s.code==='SP-'+directionStream[2]);if(stream){context.stream=stream.id;pending=directionStream[1];continue;}}
-      const field=line.match(/(?:^|\s)(ПӘН|МҰҒАЛІМ|ПОТОК|АҒЫМ|УАҚЫТЫ|КҮНІ|СІЛТЕМЕ|ЖАУАПТЫ)\s*:\s*(.*)$/i);
+      const field=line.match(/(?:^|\s)(ПӘН|МҰҒАЛІМ|ПОТОК|АҒЫМ|УАҚЫТЫ|КҮНІ|СІЛТЕМЕ|ЖАУАПТЫ|КОМБИНАЦИЯ|КОМБИНАЦИЯЛАР|БАҒЫТ|БАҒЫТТАР)\s*:\s*(.*)$/i);
       if(field) {
         const key=norm(field[1]), value=clean(field[2]);
         if(key==='ПӘН') {finish();const subject=subjectAliases[norm(value)]||'';const s=settings.streams.find(s=>s.id===context.stream);row=makeRow(settings,{...context,subject,directions:directions(pending),month:(s?.month||1)+Number(settings.offsets[subject]||0),number:s?.number||1,sourceLine:i+1});if(!subject)warnings.push(`${i+1}-жол: «${value}» пәні танылмады.`);pending='';}
+        // «КОМБИНАЦИЯ:» may come before ПӘН (it then waits for the next lesson) or after it (it belongs to this lesson).
+        else if(/^(КОМБИНАЦИЯ|КОМБИНАЦИЯЛАР|БАҒЫТ|БАҒЫТТАР)$/.test(key)){if(row&&!row.directions.length)row.directions=directions(value);else pending=value;}
         else if(row&&key==='МҰҒАЛІМ')row.teacher=value;
         else if(row&&['ПОТОК','АҒЫМ'].includes(key))row.cohort=Number(value);
         else if(row&&key==='КҮНІ')row.date=dateFrom(value,settings.year);
         else if(row&&key==='УАҚЫТЫ') {const m=value.match(/^(\d{1,2}:[0-5]\d)\s*[-–—]\s*(\d{1,2}:[0-5]\d)$/);if(m){row.start=m[1].padStart(5,'0');row.end=m[2].padStart(5,'0');}else warnings.push(`${i+1}-жол: уақыт «15:00-16:30» түрінде болуы керек.`);}
         continue;
       }
-      if(line.startsWith('@')||/https?:\/\//.test(line))continue;
+      // Contact lines («ЖАУАПТЫ: @…», «мұғаліміміз: @adilet_tarih 🎩») and links are not part of the schedule.
+      if(/(^|\s)@[\w.]+/.test(line)||/https?:\/\//.test(line))continue;
       if(/^[А-ЯӘІҢҒҮҰҚӨҺA-Z0-9\s,;\-–]+$/i.test(line))pending=line;
       else warnings.push(`${i+1}-жол танылмады: ${line}`);
     }
